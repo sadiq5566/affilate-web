@@ -1,0 +1,23 @@
+{
+  "name": "couponweb",
+  "private": true,
+  "description": "Affiliate coupons & deals website + admin dashboard (UK / FR / IT)",
+  "workspaces": [
+    "server",
+    "website",
+    "dashboard"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run seed",
+    "seed": "npm run seed -w server",
+    "dev": "concurrently -k -n api,web,admin -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w website\" \"npm run dev -w dashboard\"",
+    "build": "npm run build -w website && npm run build -w dashboard",
+    "start": "concurrently -k -n api,web \"npm run start -w server\" \"npm run start -w website\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=22.13"
+  }
+}
