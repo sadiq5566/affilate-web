@@ -1,21 +1,24 @@
 {
   "name": "couponweb",
   "private": true,
-  "description": "Affiliate coupons & deals website + admin dashboard (UK / FR / IT)",
-  "workspaces": [
-    "server",
-    "website",
-    "dashboard"
-  ],
+  "description": "Affiliate coupons & deals website with built-in admin dashboard and tracking API (UK / FR / IT) – a single Next.js app",
   "scripts": {
-    "setup": "npm install && npm run seed",
-    "seed": "npm run seed -w server",
-    "dev": "concurrently -k -n api,web,admin -c blue,green,magenta \"npm run dev -w server\" \"npm run dev -w website\" \"npm run dev -w dashboard\"",
-    "build": "npm run build -w website && npm run build -w dashboard",
-    "start": "concurrently -k -n api,web \"npm run start -w server\" \"npm run start -w website\""
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "setup": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/setup.mjs",
+    "seed": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed.mjs --demo",
+    "seed:clean": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed.mjs",
+    "seed:extras": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-extras.mjs",
+    "seed:articles": "node --disable-warning=ExperimentalWarning --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-articles.mjs"
   },
-  "devDependencies": {
-    "concurrently": "^9.1.2"
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.6.0",
+    "recharts": "^2.15.3"
   },
   "engines": {
     "node": ">=22.13"

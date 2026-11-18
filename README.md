@@ -1,32 +1,81 @@
-# DealHaven: affiliate coupons & deals platform (UK, France, Italy)
+# DealHaven: affiliate coupons & deals platform (UK, Germany, France, Italy)
 
-A complete affiliate-marketing setup in one repo:
+One Next.js app does everything: public website, admin dashboard, tracking API and database.
 
-| Folder | What it is | Tech | Dev URL |
-|---|---|---|---|
-| `server/` | API, database, affiliate click tracking, commission postbacks | Node 22+, Express 5, SQLite (built into Node) | http://localhost:4000 |
-| `website/` | Public coupon & deals website (SEO-friendly, server rendered) | Next.js 15 | http://localhost:3000 |
-| `dashboard/` | Admin dashboard: manage everything and see earnings | React + Vite + Recharts | http://localhost:5173 |
+| Part | Where | URL (dev) |
+|---|---|---|
+| Public coupon & deals website | `app/(site)/` | http://localhost:3000 |
+| Admin dashboard | `app/(admin)/admin/` + `components/admin/` | http://localhost:3000/admin |
+| Click tracking, postback, admin API | `app/go/`, `app/api/` | `/go/...`, `/api/...` |
+| Database, auth, analytics logic | `lib/server/` (SQLite, built into Node) | file `data/app.db` |
 
 ## Quick start
 
 ```bash
-npm run setup     # install everything + create the database with demo data
-npm run dev       # start API + website + dashboard together
+npm install
+npm run setup     # creates .env.local (random JWT_SECRET) + the local database + demo content + blog articles
+npm run dev       # website + dashboard + API on http://localhost:3000
 ```
 
-Dashboard login (development): **admin@example.com / admin123**. Change it in *Dashboard → Settings*,
-or set `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `server/.env` **before the first start**.
+`npm run setup` is safe to repeat: it never overwrites `.env.local` and never wipes data. Needs Node 22.13+.
 
-Copy `server/.env.example → server/.env`, `website/.env.example → website/.env.local` and
-`dashboard/.env.example → dashboard/.env` to configure things.
+Dashboard: **http://localhost:3000/admin**, login (development): **admin@example.com / admin123** (from `ADMIN_EMAIL` / `ADMIN_PASSWORD`).
+Those two only create the **first** account; later change the password in *Admin → Settings*.
+
+### Environment (`.env.local`, see `.env.example`)
+
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | Public URL (canonical links, sitemap, postback URL). Use your https domain in production |
+| `DEFAULT_REGION` | Region when the visitor's country is unknown: UK, DE, FR or IT |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | First admin account |
+| `JWT_SECRET` | Signs admin sessions. 32+ random characters in production |
+| `DATA_DIR` | Where `app.db` (SQLite) and `uploads/` live. Needs a persistent disk in production |
+
+In production the app logs a warning if `JWT_SECRET` is short, the admin password is still `admin123` or the site URL is localhost.
+
+### Database commands
+
+| Command | What it does |
+|---|---|
+| `npm run setup` | everything above in one go |
+| `npm run seed` | demo catalog + 60 days of fake clicks/sales (skips if stores exist) |
+| `npm run seed:extras` | demo events, German demo shops, one fully filled store |
+| `npm run seed:articles` | 7 starter blog articles (never overwrites edited ones) |
+| `npm run seed -- --force` | **wipes** catalog and analytics, then reloads the demo |
+
+Back up the `data/` folder to back up everything.
+
+## Blog
+
+Articles live in *Admin → Articles* (Markdown text, topic, author, schedule date, SEO fields, cover image, CSV import/export) and are published at `/blog` and `/blog/{slug}` with Article and Breadcrumb structured data, in the sitemap, and on the homepage.
+
+## Coupon system (from the blueprints in `claude/`)
+
+- **Regions:** UK, Germany, France, Italy (cookie + geo/browser-language detection). Page titles use the local wording, e.g. "Zalando Rabattcode & Gutscheine – November 2026".
+- **Coupon types:** *code* ("Show code"), *sale* (no code) and *printable*. Store pages have All / Codes / Sale / Printable tabs (`?coupon_type=`).
+- **Show code:** the shop opens in a new tab, this tab shows a pop-up with the code. The real code is **not** in the page HTML: it is loaded from `POST /api/coupons/:id/reveal` (rate limited). The pop-up has its own shareable URL `/stores/{store}/{couponId}`.
+- **Trust labels are real data only:** "checked 2h ago" comes from *Last checked* (admin: coupon *verified_at*, bulk action *Mark verified now*); "Popular today" needs 5+ real clicks today; star ratings and success rate only appear when entered on the store (no fake numbers, no rating markup without them).
+- **Store page:** rating, "manually checked" badge, stats bar, editor box, FAQ accordion (per store, or generic defaults) with FAQ / Breadcrumb / CollectionPage structured data.
+- **Events (Aktionen):** `/events` and `/events/{slug}` (Black Friday…). Manage in Admin → Events, assign coupons on the Coupons page.
+- **Search:** live suggestions (stores + offers) in the header and on the home page.
+- **Legal:** affiliate disclosure, cookie banner, Impressum template (needed for Germany).
+- `npm run seed:extras` adds demo events, German demo shops and one fully filled store to an existing database.
+
+## Admin: filters and CSV
+
+Every list in the dashboard (products, coupons, stores, categories, sales, clicks, subscribers) has:
+
+- **Filters** panel: dropdown filters, min/max ranges (price, commission, times used…), a date range, sorting and page size. Active filters show as removable chips and are remembered per page.
+- **Export CSV**: downloads exactly what the current filters show.
+- **Import CSV**: upload or paste a CSV (a template can be downloaded in the dialog). Existing items are updated, new ones created, so export → edit in Excel → import works for bulk edits. Empty cells never overwrite existing values. Products and coupons CSVs can use `store_slug, store_name, category, type (code/sale/print)`: missing stores, categories and events are created automatically.
 
 ## How the money flow works
 
 ```
 Visitor clicks "Get Code" / "Get Deal"
    → website /go/coupon/12         (our own domain, rel="sponsored nofollow")
-   → API logs the click with a unique click_id
+   → the site logs the click with a unique click_id
    → 302 redirect to your affiliate link with ?clickref=<click_id>  (or wherever you put {click_id})
    → visitor buys at the shop
    → the affiliate network calls our postback URL with the click_id + commission
@@ -66,11 +115,11 @@ Visitor clicks "Get Code" / "Get Deal"
 
 ## Database
 
-SQLite file at `server/data/app.db` (uploads in `server/data/uploads/`). Back up this folder.
+SQLite file at `data/app.db` (uploads in `data/uploads/`). Back up this folder.
 
 ```bash
-npm run seed -w server -- --force          # wipe catalog + analytics and reload demo data
-node server/src/seed.js --force            # wipe and load demo catalog only (no fake clicks/sales)
+npm run seed -- --force                    # wipe catalog + analytics and reload demo data
+npm run seed:clean -- --force              # wipe and load demo catalog only (no fake clicks/sales)
 ```
 
 **Before going live:** delete the demo stores, coupons and products, or reseed without `--demo`. The demo
@@ -78,8 +127,6 @@ merchants are fictional and their links point to example.com.
 
 ## Deploying
 
-- **API (`server/`)**: any Node 22.13+ host with a persistent disk (Railway, Render, Fly.io, a VPS). Set
-  `API_PUBLIC_URL`, `SITE_URL`, `CORS_ORIGINS`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`.
-- **Website (`website/`)**: Vercel or any Node host. Set `API_URL` (where the API is) and `NEXT_PUBLIC_SITE_URL`.
-- **Dashboard (`dashboard/`)**: `npm run build -w dashboard` builds a static site in `dashboard/dist`. Host it anywhere
-  (Netlify, Vercel, Cloudflare Pages) and set `VITE_API_URL` to the API URL at build time.
+Deploy as one Next.js app on any Node 22.13+ host **with a persistent disk** (VPS, Railway, Render, Fly.io) because the
+database and uploads live in `DATA_DIR`. (Serverless hosts with an ephemeral filesystem, e.g. Vercel, will lose data.)
+Set `NEXT_PUBLIC_SITE_URL`, `JWT_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `DATA_DIR`, then `npm run build && npm start`.
